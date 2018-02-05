@@ -41,7 +41,9 @@ func (ls *SyncStorage) GetAllKeys() []string {
 	// having no opportunity to get length of ls.internalStorage i have chosen 0 & 16 magic numbers
 	keys := make([]string, 0, 16)
 	ls.internalStorage.Range(func(key interface{}, value interface{}) bool {
-		keys = append(keys, key.(string)) // FIXME unsafe
+		if ls.notExpired(value.(*StorableWithMeta)) {
+			keys = append(keys, key.(string)) // FIXME unsafe
+		}
 		return true
 	})
 	return keys
@@ -50,7 +52,7 @@ func (ls *SyncStorage) GetAllKeys() []string {
 // GetValueByKey ....
 func (ls *SyncStorage) GetValueByKey(key string) (*StorableWithMeta, bool) {
 	if value, exists := ls.internalStorage.Load(key); exists {
-		return value.(*StorableWithMeta), exists
+		return ls.filterExpired(value.(*StorableWithMeta))
 	}
 	return nil, false
 }
@@ -64,7 +66,7 @@ func (ls *SyncStorage) DeleteValueByKey(key string) bool {
 // GetNestedValueByKeyAndIndex ....
 func (ls *SyncStorage) GetNestedValueByKeyAndIndex(key string, index int) (*StorableWithMeta, bool, error) {
 	if maybeSlice, exists := ls.internalStorage.Load(key); exists {
-		if swm, yes := maybeSlice.(*StorableWithMeta); yes {
+		if swm, yes := maybeSlice.(*StorableWithMeta); yes && ls.notExpired(swm) {
 			slice, yes := swm.Entity.([]string) // TODO  looks ugly. consider another generic / polymorphic construction
 			if yes {
 				if index >= 0 && index < len(slice) {
@@ -82,7 +84,7 @@ func (ls *SyncStorage) GetNestedValueByKeyAndIndex(key string, index int) (*Stor
 // GetNestedValueByKeyAndSubkey ...
 func (ls *SyncStorage) GetNestedValueByKeyAndSubkey(key string, subKey string) (*StorableWithMeta, bool, error) {
 	if maybeDict, exists := ls.internalStorage.Load(key); exists {
-		if swm, yes := maybeDict.(*StorableWithMeta); yes {
+		if swm, yes := maybeDict.(*StorableWithMeta); yes && ls.notExpired(swm) {
 			dict, yes := swm.Entity.(map[string]string) // TODO  looks ugly. consider another generic / polymorphic construction
 			if yes {
 				val, ok := dict[subKey]
@@ -130,4 +132,16 @@ func (ls *SyncStorage) expireObsolete() {
 		log.Println("Expiring enity with key: " + key)
 		ls.internalStorage.Delete(key)
 	}
+}
+
+func (ls *SyncStorage) filterExpired(entity *StorableWithMeta) (*StorableWithMeta, bool) {
+	if ls.notExpired(entity) {
+		return entity, true
+	}
+	return nil, false
+}
+
+func (ls *SyncStorage) notExpired(entity *StorableWithMeta) bool {
+	now := time.Now()
+	return !entity.LastWriteTime.Add(ls.ttl).Before(now)
 }
