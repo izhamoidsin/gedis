@@ -17,9 +17,9 @@ func newStorableWithMeta(entity Storable) *StorableWithMeta {
 
 // enpackStorable call wraps internal element (cell of slice or value extracted from map)
 // to the StorableWithMeta with LastWriteTime nested from top-level storable entity
-func enpackStorable(Entity Storable, ref *StorableWithMeta) *StorableWithMeta {
+func enpackStorable(entity Storable, ref *StorableWithMeta) *StorableWithMeta {
 	s := new(StorableWithMeta)
-	s.Entity = Entity
+	s.Entity = entity
 	s.LastWriteTime = ref.LastWriteTime
 	return s
 }
@@ -32,6 +32,8 @@ type Storable interface{}
 
 // Storage is a basic interface for any kind of redis-like registry implementation
 type Storage interface {
+	getTtl() time.Duration
+
 	GetAllKeys() []string
 
 	GetValueByKey(key string) (*StorableWithMeta, bool)
@@ -45,6 +47,18 @@ type Storage interface {
 	UpdateValueByKey(key string, newValue Storable) error
 
 	AppendNewValue(key string, newValue Storable) error
+}
 
-	expireObsolete()
+// TODO refactor : pass ttl
+func filterExpired(entity *StorableWithMeta, ls Storage) (*StorableWithMeta, bool) {
+	if notExpired(entity, ls) {
+		return entity, true
+	}
+	return nil, false
+}
+
+// TODO refactor : pass ttl
+func notExpired(entity *StorableWithMeta, ls Storage) bool {
+	now := time.Now()
+	return !entity.LastWriteTime.Add(ls.getTtl()).Before(now)
 }

@@ -6,7 +6,7 @@ import (
 )
 
 var testTTL = time.Second * 2
-var testStorage Storage = InitSyncStorage(testTTL)
+var testStorage Storage = InitSyncMapStorage(testTTL)
 
 func TestEmpty(t *testing.T) {
 	if len(testStorage.GetAllKeys()) != 0 {
@@ -114,7 +114,7 @@ func TestExpirationOnDemand(t *testing.T) {
 		"the_second": "Francois",
 	}
 	var testVeryShortTTL = time.Microsecond * 50
-	var testStorage Storage = InitSyncStorage(testVeryShortTTL)
+	var testStorage Storage = InitSyncMapStorage(testVeryShortTTL)
 
 	testStorage.AppendNewValue(key, value)
 	testStorage.AppendNewValue(dictKey, dictValue)
