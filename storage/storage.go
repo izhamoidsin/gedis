@@ -32,8 +32,6 @@ type Storable interface{}
 
 // Storage is a basic interface for any kind of redis-like registry implementation
 type Storage interface {
-	getTtl() time.Duration
-
 	GetAllKeys() []string
 
 	GetValueByKey(key string) (*StorableWithMeta, bool)
@@ -49,8 +47,13 @@ type Storage interface {
 	AppendNewValue(key string, newValue Storable) error
 }
 
+type LazyExpireStorage interface {
+	getTtl() time.Duration
+	// todo add vacuuming
+}
+
 // TODO refactor : pass ttl
-func filterExpired(entity *StorableWithMeta, ls Storage) (*StorableWithMeta, bool) {
+func filterExpired(entity *StorableWithMeta, ls LazyExpireStorage) (*StorableWithMeta, bool) {
 	if notExpired(entity, ls) {
 		return entity, true
 	}
@@ -58,7 +61,7 @@ func filterExpired(entity *StorableWithMeta, ls Storage) (*StorableWithMeta, boo
 }
 
 // TODO refactor : pass ttl
-func notExpired(entity *StorableWithMeta, ls Storage) bool {
+func notExpired(entity *StorableWithMeta, ls LazyExpireStorage) bool {
 	now := time.Now()
 	return !entity.LastWriteTime.Add(ls.getTtl()).Before(now)
 }
